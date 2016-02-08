@@ -3,7 +3,7 @@
 'use strict'
 
 var Parser = require('jsonparse')
-  , through = require('through')
+  , through2 = require('through2')
 
 /*
 
@@ -17,15 +17,11 @@ var Parser = require('jsonparse')
 exports.parse = function (path, map) {
 
   var parser = new Parser()
-  var stream = through(function (chunk) {
+  var stream = through2.obj(function (chunk, _, next) {
     if('string' === typeof chunk)
       chunk = new Buffer(chunk)
     parser.write(chunk)
-  },
-  function (data) {
-    if(data)
-      stream.write(data)
-    stream.queue(null)
+    next()
   })
 
   if('string' === typeof path)
@@ -85,7 +81,7 @@ exports.parse = function (path, map) {
     var data = this.value[this.key]
     if(null != data)
       if(null != (data = map ? map(data, actualPath) : data))
-        stream.queue(data)
+        stream.push(data)
     delete this.value[this.key]
     for(var k in this.stack)
       this.stack[k].value = null
@@ -97,13 +93,13 @@ exports.parse = function (path, map) {
     if (this.stack.length === 0) {
       if (stream.root) {
         if(!path)
-          stream.queue(stream.root)
+          stream.push(stream.root)
         count = 0;
         stream.root = null;
       }
     }
   }
-  
+
   parser.onError = function (err) {
     if(err.message.indexOf("at position") > -1)
       err.message = "Invalid JSON (" + err.message + ")";
@@ -145,17 +141,16 @@ exports.stringify = function (op, sep, cl, indent) {
   var stream
     , first = true
     , anyData = false
-  stream = through(function (data) {
+  stream = through2.obj(function (data, _, next) {
     anyData = true
     var json = JSON.stringify(data, null, indent)
-    if(first) { first = false ; stream.queue(op + json)}
-    else stream.queue(sep + json)
+    if(first) { first = false ; next(null, op + json)}
+    else next(null, sep + json)
   },
-  function (data) {
-    if(!anyData)
-      stream.queue(op)
-    stream.queue(cl)
-    stream.queue(null)
+  function (cb) {
+    if(!anyData) stream.push(op)
+    stream.push(cl)
+    cb()
   })
 
   return stream
@@ -179,17 +174,16 @@ exports.stringifyObject = function (op, sep, cl, indent) {
 
   var first = true
   var anyData = false
-  var stream = through(function (data) {
+  var stream = through2.obj(function (data, _, next) {
     anyData = true
     var json = JSON.stringify(data[0]) + ':' + JSON.stringify(data[1], null, indent)
-    if(first) { first = false ; this.queue(op + json)}
-    else this.queue(sep + json)
+    if(first) { first = false ; next(null, op + json)}
+    else next(null, sep + json)
   },
-  function (data) {
-    if(!anyData) this.queue(op)
-    this.queue(cl)
-
-    this.queue(null)
+  function (cb) {
+    if(!anyData) this.push(op)
+    this.push(cl)
+    cb()
   })
 
   return stream
