@@ -146,8 +146,11 @@ exports.stringify = function (op, sep, cl, indent) {
     else next(null, sep + json)
   },
   function (cb) {
-    if(!anyData) stream.push(op)
-    stream.push(cl)
+    // never push empty strings into an object stream, if
+    // you want it to end.
+    if (!anyData && op) stream.push(op)
+    if (cl) stream.push(cl)
+
     cb()
   })
 
@@ -179,8 +182,9 @@ exports.stringifyObject = function (op, sep, cl, indent) {
     else next(null, sep + json)
   },
   function (cb) {
-    if(!anyData) this.push(op)
-    this.push(cl)
+    if (!anyData && op) this.push(op)
+    if (cl) this.push(cl)
+
     cb()
   })
 
